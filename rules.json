@@ -1,6 +1,32 @@
 {
   "source_dir": "~/Downloads",
   "target_root": "~/Downloads",
+  "folders": {
+    "downloads": {
+      "source_dir": "~/Downloads",
+      "target_root": "~/Downloads"
+    },
+    "documents": {
+      "source_dir": "~/Documents",
+      "target_root": "~/Documents"
+    },
+    "pictures": {
+      "source_dir": "~/Pictures",
+      "target_root": "~/Pictures"
+    },
+    "videos": {
+      "source_dir": "~/Videos",
+      "target_root": "~/Videos"
+    },
+    "music": {
+      "source_dir": "~/Music",
+      "target_root": "~/Music"
+    },
+    "desktop": {
+      "source_dir": "~/Desktop",
+      "target_root": "~/Desktop"
+    }
+  },
   "default_folder": "Outros",
   "ai": {
     "enabled": true,

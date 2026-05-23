@@ -17,7 +17,7 @@ Sem dependencias externas. Simulacao por padrao. Nada muda no computador sem `--
 
 ```powershell
 python organizer.py --doctor
-python organizer.py --profile downloads
+python organizer.py --folder downloads
 ```
 
 O primeiro comando verifica a configuracao. O segundo simula a organizacao da pasta Downloads.
@@ -25,7 +25,7 @@ O primeiro comando verifica a configuracao. O segundo simula a organizacao da pa
 Para aplicar de verdade:
 
 ```powershell
-python organizer.py --profile downloads --apply
+python organizer.py --folder downloads --apply
 ```
 
 ## Configurar IA
@@ -43,13 +43,19 @@ O projeto usa `gemini-2.5-flash-lite` por padrao, pensado para uso leve no Free 
 Comandos uteis:
 
 ```powershell
+python organizer.py --folder list
+python organizer.py --folder downloads
+python organizer.py --folder documents
+python organizer.py --folder pictures
+python organizer.py --folder videos
+python organizer.py --folder music
 python organizer.py --profile list
-python organizer.py --profile documents
-python organizer.py --profile desktop
 python organizer.py --no-ai
 ```
 
-Perfis ficam em `profiles/` e sobrescrevem o `rules.json` base.
+As pastas padrao ficam em `folders` dentro do `rules.json`.
+
+Perfis continuam disponiveis em `profiles/` para casos avancados.
 
 ### Wizard
 

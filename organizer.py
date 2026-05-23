@@ -91,6 +91,34 @@ def available_profiles() -> list[str]:
     return sorted(path.stem for path in root.glob("*.json"))
 
 
+def available_folders(config: dict[str, Any]) -> list[str]:
+    folders = config.get("folders", {})
+    if not isinstance(folders, dict):
+        return []
+    return sorted(folders)
+
+
+def apply_folder_choice(config: dict[str, Any], folder_name: str) -> dict[str, Any]:
+    folders = config.get("folders", {})
+    if not isinstance(folders, dict):
+        raise ValueError("Nenhum bloco folders foi definido no arquivo de configuracao.")
+    if folder_name == "list":
+        print("\nPastas disponiveis")
+        print("------------------")
+        for name in available_folders(config):
+            folder_config = folders[name]
+            source = folder_config.get("source_dir", "")
+            print(f"- {name}: {source}")
+        raise SystemExit(0)
+    if folder_name not in folders:
+        available = ", ".join(available_folders(config)) or "nenhuma"
+        raise ValueError(f"Pasta desconhecida: {folder_name}. Disponiveis: {available}")
+    folder_config = folders[folder_name]
+    if not isinstance(folder_config, dict):
+        raise ValueError(f"Config invalida para folder: {folder_name}")
+    return deep_merge(config, folder_config)
+
+
 def load_config_for_args(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
     base_path = Path(args.config)
     config = load_config(base_path)
@@ -111,7 +139,8 @@ def load_config_for_args(args: argparse.Namespace) -> tuple[dict[str, Any], Path
 
     selected_profile_path = profile_path(args.profile)
     profile_config = load_config(selected_profile_path)
-    return deep_merge(config, profile_config), selected_profile_path
+    config = deep_merge(config, profile_config)
+    return config, selected_profile_path
 
 
 def load_env(path: Path = Path(ENV_FILE)) -> None:
@@ -1666,6 +1695,7 @@ def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> No
     protected_patterns = config.get("protected_patterns", [])
     auto_protect_config = config.get("auto_protect", {})
     profiles = available_profiles()
+    folders = available_folders(config)
 
     doctor_check("pasta de origem", source_dir.exists(), str(source_dir))
     doctor_check("destino base", target_root.exists() or target_root.parent.exists(), str(target_root))
@@ -1681,6 +1711,7 @@ def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> No
     auto_status = "ligada" if auto_protect_config.get("enabled", True) else "desligada"
     print(f"Pastas protegidas: {len(protected_names)} nomes, {len(protected_patterns)} padroes")
     print(f"Auto-protecao: {auto_status}")
+    print(f"Pastas padrao: {', '.join(folders) if folders else 'nenhuma'}")
     print(f"Perfis disponiveis: {', '.join(profiles) if profiles else 'nenhum'}")
     print_done("diagnostico concluido.")
 
@@ -1697,6 +1728,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--profile",
         help="Carrega um perfil de profiles/<nome>.json sobre rules.json. Use --profile list para listar.",
+    )
+    parser.add_argument(
+        "--folder",
+        help="Escolhe uma pasta padrao do bloco folders em rules.json. Use --folder list para listar.",
     )
     parser.add_argument(
         "--apply",
@@ -1751,6 +1786,8 @@ def main() -> None:
         return
 
     config, config_path = load_config_for_args(args)
+    if args.folder:
+        config = apply_folder_choice(config, args.folder)
     source_dir = expand_path(config["source_dir"])
     target_root = expand_path(config.get("target_root") or config["source_dir"])
 
