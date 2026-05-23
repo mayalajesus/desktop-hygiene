@@ -105,13 +105,35 @@ Itens protegidos nao entram no plano, nao sao enviados para IA e bloqueiam plano
 
 ## Contexto Para IA
 
-Use `context.glossary` para ensinar termos especificos:
+O contexto padrao foi direcionado para programadores Python, desenvolvedores e gamers.
+
+Ele entende melhor itens como:
+
+- projetos Python, scripts, notebooks e dependencias
+- repositorios, workspaces, APIs, SDKs, Docker e CLIs
+- jogos, mods, saves, launchers e mod loaders
+
+Categorias relevantes:
+
+```text
+Dev/Python
+Dev/Projetos
+Dev/Repositorios
+Dev/Notebooks
+Dev/Documentacao
+Dev/Ferramentas
+Jogos/Mods
+Jogos/Saves
+```
+
+Use `context.glossary` para ensinar termos ainda mais especificos:
 
 ```json
 {
   "context": {
     "glossary": {
       "SMAPI": "Stardew Modding API; mod loader de Stardew Valley. Classifique como Jogos/Mods.",
+      "FastAPI": "Framework web/API Python. Classifique como Dev/Python ou Dev/Projetos.",
       "Forge": "Mod loader de Minecraft. Classifique como Jogos/Mods."
     }
   }
