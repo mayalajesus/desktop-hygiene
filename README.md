@@ -89,14 +89,17 @@ python organizer.py --undo logs/undo_organize_YYYY-MM-DD_HH-MM-SS.json --apply
 
 Ao rodar em `Documentos`, algumas pastas pertencem a softwares, jogos, IDEs ou sincronizadores. Elas nao devem ser movidas.
 
-Configure em `rules.json`:
+O app tenta detectar isso sozinho usando sinais locais:
 
-```json
-{
-  "protected_names": ["My Games", "GitHub", "Codex", "Visual Studio 2022"],
-  "protected_patterns": ["*SharedFolder", "Adobe*", ".vscode", ".obsidian"]
-}
-```
+- nomes como `GitHub`, `Codex`, `My Games`
+- padroes como `*SharedFolder`
+- filhos como `.git`, `.vscode`, `node_modules`, `package.json`
+- arquivos operacionais como `.exe`, `.dll`, `.bat`, `.ps1`
+- palavras como `workspace`, `saves`, `config`, `settings`
+
+Isso fica em `auto_protect` no `rules.json` e vem ligado por padrao.
+
+As listas `protected_names` e `protected_patterns` continuam existindo, mas agora sao complemento. Use apenas para casos especiais que o detector automatico nao pegou.
 
 Itens protegidos nao entram no plano, nao sao enviados para IA e bloqueiam planos estruturais inseguros.
 

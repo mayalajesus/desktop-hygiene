@@ -78,6 +78,56 @@
     "*.part",
     "~$*"
   ],
+  "auto_protect": {
+    "enabled": true,
+    "names": [
+      "Codex",
+      "GitHub",
+      "My Games",
+      "My Music",
+      "My Pictures",
+      "My Videos",
+      "Meus Videos",
+      "Minhas Imagens",
+      "Minhas Musicas"
+    ],
+    "keywords": [
+      "sharedfolder",
+      "workspace",
+      "workspaces",
+      "user files",
+      "save games",
+      "saves",
+      "cache",
+      "config",
+      "settings",
+      "visual studio",
+      "androidstudio",
+      "autodesk",
+      "adobe",
+      "nvidia",
+      "dbeaver",
+      "rockstar",
+      "electronic arts",
+      "paradox",
+      "mumu",
+      "nebula"
+    ],
+    "child_markers": [
+      ".git",
+      ".vscode",
+      ".idea",
+      "node_modules",
+      "package.json",
+      "pyproject.toml",
+      "requirements.txt",
+      "settings.json",
+      "config.json",
+      "workspace.json",
+      "saves",
+      "savegames"
+    ]
+  },
   "protected_names": [
     "Adobe",
     "AdobeStock",

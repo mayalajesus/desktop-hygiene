@@ -217,6 +217,35 @@ def is_protected_path(relative_path: Path, protected_names: set[str], protected_
     return matches_pattern(relative_path, protected_patterns)
 
 
+def child_names(path: Path, limit: int = 40) -> list[str]:
+    try:
+        return sorted(child.name for child in path.iterdir())[:limit]
+    except OSError:
+        return []
+
+
+def looks_like_software_folder(path: Path, auto_config: dict[str, Any]) -> tuple[bool, str]:
+    """Detect folders that are likely owned by software rather than the user."""
+
+    if not path.is_dir() or not auto_config.get("enabled", True):
+        return False, ""
+
+    name = path.name.casefold()
+    names = [value.casefold() for value in auto_config.get("names", [])]
+    keywords = [value.casefold() for value in auto_config.get("keywords", [])]
+    child_markers = [value.casefold() for value in auto_config.get("child_markers", [])]
+    children = child_names(path)
+    child_text = " ".join(children).casefold()
+
+    if name in names:
+        return True, "nome conhecido de software/sistema"
+    if any(keyword in name for keyword in keywords):
+        return True, "palavra-chave de software/sistema"
+    if any(marker in child_text for marker in child_markers):
+        return True, "conteudo interno parece operacional"
+    return False, ""
+
+
 def should_skip(
     path: Path,
     source_dir: Path,
@@ -224,6 +253,7 @@ def should_skip(
     ignored_patterns: list[str],
     protected_names: set[str],
     protected_patterns: list[str],
+    auto_protect_config: dict[str, Any],
 ) -> bool:
     if path.name in ignored_names:
         return True
@@ -237,6 +267,10 @@ def should_skip(
         relative_path = Path(path.name)
 
     if is_protected_path(relative_path, protected_names, protected_patterns):
+        return True
+
+    auto_protected, _reason = looks_like_software_folder(path, auto_protect_config)
+    if auto_protected:
         return True
 
     try:
@@ -697,6 +731,7 @@ def collect_structure(
     ignored_patterns: list[str],
     protected_names: set[str],
     protected_patterns: list[str],
+    auto_protect_config: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Collect a bounded, protected-safe tree snapshot for architect mode."""
 
@@ -716,6 +751,9 @@ def collect_structure(
         if matches_ignored_pattern(relative_path, ignored_patterns):
             continue
         if is_protected_path(relative_path, protected_names, protected_patterns):
+            continue
+        auto_protected, _reason = looks_like_software_folder(item, auto_protect_config)
+        if auto_protected:
             continue
         if relative_depth(relative_path) > max_scan_depth:
             continue
@@ -930,6 +968,7 @@ def create_restructure_plan(config: dict[str, Any]) -> RestructurePlan:
     ignored_patterns = list(config.get("ignored_patterns", []))
     protected_names = set(config.get("protected_names", []))
     protected_patterns = list(config.get("protected_patterns", []))
+    auto_protect_config = config.get("auto_protect", {})
     ai_config = config.get("ai", {})
     restructure_config = config.get("restructure", {})
     context_config = config.get("context", {})
@@ -948,6 +987,7 @@ def create_restructure_plan(config: dict[str, Any]) -> RestructurePlan:
         ignored_patterns,
         protected_names,
         protected_patterns,
+        auto_protect_config,
     )
     raw_plan = ask_gemini_for_restructure_plan(source_dir, structure, ai_config, restructure_config, context_config)
     return validate_restructure_plan(
@@ -1170,6 +1210,7 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
     ignored_patterns = list(config.get("ignored_patterns", []))
     protected_names = set(config.get("protected_names", []))
     protected_patterns = list(config.get("protected_patterns", []))
+    auto_protect_config = config.get("auto_protect", {})
     extension_rules = build_extension_rules(config.get("extension_rules", {}))
     default_folder = config.get("default_folder")
     ai_config = config.get("ai", {})
@@ -1191,12 +1232,23 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         except ValueError:
             relative_path = Path(item.name)
 
-        if is_protected_path(relative_path, protected_names, protected_patterns):
+        auto_protected, reason = looks_like_software_folder(item, auto_protect_config)
+        if is_protected_path(relative_path, protected_names, protected_patterns) or auto_protected:
             protected_skipped += 1
             skipped += 1
+            if auto_protected and protected_skipped <= 5:
+                print(f"Auto-protegido: {item.name} ({reason})")
             continue
 
-        if should_skip(item, source_dir, ignored_names, ignored_patterns, protected_names, protected_patterns):
+        if should_skip(
+            item,
+            source_dir,
+            ignored_names,
+            ignored_patterns,
+            protected_names,
+            protected_patterns,
+            auto_protect_config,
+        ):
             skipped += 1
             continue
 
@@ -1612,6 +1664,7 @@ def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> No
     ai_config = config.get("ai", {})
     protected_names = config.get("protected_names", [])
     protected_patterns = config.get("protected_patterns", [])
+    auto_protect_config = config.get("auto_protect", {})
     profiles = available_profiles()
 
     doctor_check("pasta de origem", source_dir.exists(), str(source_dir))
@@ -1625,7 +1678,9 @@ def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> No
     else:
         print("IA: desligada nesta configuracao/execucao")
 
+    auto_status = "ligada" if auto_protect_config.get("enabled", True) else "desligada"
     print(f"Pastas protegidas: {len(protected_names)} nomes, {len(protected_patterns)} padroes")
+    print(f"Auto-protecao: {auto_status}")
     print(f"Perfis disponiveis: {', '.join(profiles) if profiles else 'nenhum'}")
     print_done("diagnostico concluido.")
 
