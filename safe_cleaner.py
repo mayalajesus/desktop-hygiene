@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""Conservative Windows cleaner for technical caches and temporary files.
+
+This tool is intentionally boring:
+
+- It previews by default and only deletes with ``--apply``.
+- It avoids personal folders and limits itself to known cache/temp locations.
+- It skips symlinks and junctions to avoid walking outside intended roots.
+- Registry cleanup is opt-in and backs up each key before removal.
+"""
+
 import argparse
 import ctypes
 import csv
@@ -28,6 +38,8 @@ ALL_CATEGORIES = ("temp", "recycle", "browsers", "apps", "registry")
 
 @dataclass(frozen=True)
 class CleanAction:
+    """One cleanup operation that can be previewed, logged, and applied."""
+
     category: str
     action_type: str
     target: str
@@ -37,6 +49,8 @@ class CleanAction:
 
 @dataclass
 class CleanResult:
+    """Result of applying or simulating a CleanAction."""
+
     action: CleanAction
     status: str
     message: str = ""
@@ -50,6 +64,8 @@ def env_path(name: str) -> Path | None:
 
 
 def existing_paths(paths: Iterable[Path | None]) -> list[Path]:
+    """Return existing unique paths while tolerating inaccessible entries."""
+
     found: list[Path] = []
     seen: set[Path] = set()
 
@@ -73,10 +89,14 @@ def is_junction(path: Path) -> bool:
 
 
 def safe_to_delete_path(path: Path) -> bool:
+    """Allow deletion only for real paths, never symlinks or junctions."""
+
     return path.exists() and not path.is_symlink() and not is_junction(path)
 
 
 def path_size(path: Path) -> int:
+    """Best-effort recursive size calculation that ignores permission errors."""
+
     if not safe_to_delete_path(path):
         return 0
     if path.is_file():
@@ -140,6 +160,8 @@ def print_header(title: str, *, dry_run: bool, categories: list[str], older_than
 
 
 def get_running_processes() -> set[str]:
+    """Read Windows process names so open apps can be skipped safely."""
+
     try:
         result = subprocess.run(
             ["tasklist", "/FO", "CSV", "/NH"],
@@ -163,6 +185,8 @@ def app_is_running(processes: set[str], names: Iterable[str]) -> bool:
 
 
 def candidate_children(root: Path, cutoff: datetime) -> list[Path]:
+    """Return direct children old enough to clean without deleting root itself."""
+
     if not root.exists() or not root.is_dir():
         return []
 
@@ -196,6 +220,8 @@ def build_delete_actions(paths: Iterable[Path], category: str, reason: str) -> l
 
 
 def collect_temp_actions(cutoff: datetime) -> list[CleanAction]:
+    """Collect safe temp-file candidates from user and Windows temp roots."""
+
     system_root = env_path("SystemRoot") or Path("C:/Windows")
     roots = existing_paths(
         [
@@ -226,6 +252,8 @@ def logical_drives() -> list[Path]:
 
 
 def collect_recycle_action() -> list[CleanAction]:
+    """Create the single action that empties the Windows Recycle Bin."""
+
     total = 0
     for drive in logical_drives():
         recycle = drive / "$Recycle.Bin"
@@ -275,6 +303,8 @@ def chromium_cache_dirs(profile: Path) -> list[Path]:
 
 
 def collect_browser_actions(cutoff: datetime, processes: set[str], *, force_open_apps: bool) -> list[CleanAction]:
+    """Collect browser cache entries, skipping browsers that appear to be open."""
+
     actions: list[CleanAction] = []
 
     for browser, root, process_names in browser_roots():
@@ -329,6 +359,8 @@ def app_cache_specs() -> list[tuple[str, list[Path], tuple[str, ...]]]:
 
 
 def collect_app_actions(cutoff: datetime, processes: set[str], *, force_open_apps: bool) -> list[CleanAction]:
+    """Collect cache entries for common heavy desktop apps."""
+
     actions: list[CleanAction] = []
     for app, roots, process_names in app_cache_specs():
         if process_names and app_is_running(processes, process_names) and not force_open_apps:
@@ -366,6 +398,8 @@ def uninstall_registry_locations() -> list[tuple[int, str]]:
 
 
 def looks_like_orphaned_uninstall_entry(key: object) -> tuple[bool, str]:
+    """Conservatively detect uninstall registry entries left by removed apps."""
+
     display_name = read_registry_value(key, "DisplayName")
     if not display_name:
         return False, ""
@@ -386,6 +420,8 @@ def looks_like_orphaned_uninstall_entry(key: object) -> tuple[bool, str]:
 
 
 def collect_registry_actions() -> list[CleanAction]:
+    """Find opt-in registry cleanup candidates under Uninstall keys only."""
+
     if winreg is None:
         return []
 
@@ -428,6 +464,8 @@ def collect_registry_actions() -> list[CleanAction]:
 
 
 def backup_registry_key(target: str) -> Path:
+    """Export a .reg backup before deleting a registry key."""
+
     log_dir = Path(LOG_DIR)
     log_dir.mkdir(exist_ok=True)
     safe_name = "".join(char if char.isalnum() else "_" for char in target)[:120]
@@ -454,6 +492,8 @@ def delete_registry_key(target: str) -> str:
 
 
 def collect_actions(categories: list[str], older_than_days: int, *, force_open_apps: bool) -> list[CleanAction]:
+    """Collect all cleanup actions for the selected categories."""
+
     cutoff = datetime.now() - timedelta(days=older_than_days)
     processes = get_running_processes()
     actions: list[CleanAction] = []
@@ -490,6 +530,8 @@ def empty_recycle_bin() -> None:
 
 
 def apply_action(action: CleanAction, *, dry_run: bool) -> CleanResult:
+    """Apply one action while converting errors into logged results."""
+
     if dry_run:
         return CleanResult(action, "simulado")
 

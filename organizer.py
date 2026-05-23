@@ -1,5 +1,17 @@
 from __future__ import annotations
 
+"""AI-assisted desktop organization for Windows.
+
+The script has two safety principles:
+
+1. Every mutating command is a dry-run unless ``--apply`` is provided.
+2. AI output is treated as an untrusted plan and is normalized/validated before
+   anything is moved.
+
+The code intentionally uses only the Python standard library so the tool can be
+copied to another Windows machine and run without a setup step.
+"""
+
 import argparse
 import fnmatch
 import html
@@ -29,6 +41,8 @@ DEFAULT_PREVIEW_LIMIT = 25
 
 @dataclass(frozen=True)
 class MovePlan:
+    """A single filesystem move that can be previewed, applied, and undone."""
+
     source: Path
     destination: Path
     reason: str
@@ -36,12 +50,16 @@ class MovePlan:
 
 @dataclass(frozen=True)
 class RestructurePlan:
+    """A validated structural plan produced by the AI architect mode."""
+
     folders_to_create: list[Path]
     moves: list[MovePlan]
     reasoning: str
 
 
 def load_config(path: Path) -> dict[str, Any]:
+    """Load JSON config files, accepting UTF-8 files with or without BOM."""
+
     if not path.exists():
         raise FileNotFoundError(f"Arquivo de configuracao nao encontrado: {path}")
 
@@ -50,6 +68,8 @@ def load_config(path: Path) -> dict[str, Any]:
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Merge a profile override on top of the base config without mutating it."""
+
     merged = dict(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -95,6 +115,8 @@ def load_config_for_args(args: argparse.Namespace) -> tuple[dict[str, Any], Path
 
 
 def load_env(path: Path = Path(ENV_FILE)) -> None:
+    """Load a local .env file without overriding real environment variables."""
+
     if not path.exists():
         return
 
@@ -185,6 +207,8 @@ def matches_pattern(path: Path, patterns: list[str]) -> bool:
 
 
 def is_protected_path(relative_path: Path, protected_names: set[str], protected_patterns: list[str]) -> bool:
+    """Return true when a relative path touches a user/software protected area."""
+
     protected_names_normalized = {name.casefold() for name in protected_names}
     if any(part.casefold() in protected_names_normalized for part in relative_path.parts):
         return True
@@ -259,6 +283,8 @@ def relative_depth(path: Path) -> int:
 
 
 def safe_relative_path(value: str) -> Path:
+    """Parse an AI-provided path and reject absolute or parent-traversal paths."""
+
     value = str(value).strip().replace("/", "\\")
     if not value:
         raise ValueError("Caminho vazio.")
@@ -286,6 +312,8 @@ def safe_relative_path(value: str) -> Path:
 
 
 def resolve_inside_root(root: Path, relative_path: Path) -> Path:
+    """Resolve a relative path and ensure it stays inside the configured root."""
+
     resolved = (root / relative_path).resolve()
     if resolved != root and root not in resolved.parents:
         raise ValueError(f"Caminho fora da pasta raiz: {relative_path}")
@@ -354,6 +382,8 @@ def sanitize_windows_name(value: str, *, max_length: int) -> str:
 
 
 def normalize_proposed_name(value: str, item: Path, rename_config: dict[str, Any]) -> str:
+    """Convert an AI-proposed name into a safe Windows filename."""
+
     max_length = int(rename_config.get("max_length", 80))
     style = rename_config.get("style", "kebab-case")
 
@@ -399,6 +429,8 @@ def summarize_gemini_http_error(error: urllib.error.HTTPError, details: str) -> 
 
 
 def call_gemini(prompt: str, ai_config: dict[str, Any], *, max_output_tokens: int) -> str:
+    """Call Gemini with lightweight retry handling for free-tier congestion."""
+
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY nao encontrada. Confira o arquivo .env.")
@@ -474,6 +506,8 @@ def match_context_hints(item: Path, children: list[str], context_config: dict[st
 
 
 def compact_item_summary(item: Path, item_id: int, context_config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Build the compact per-item payload sent to Gemini batch classification."""
+
     context_config = context_config or {}
     stat = item.stat()
     children: list[str] = []
@@ -533,6 +567,8 @@ def ask_gemini_for_batch_organization(
     context_config: dict[str, Any],
     allowed_categories: list[str],
 ) -> dict[Path, tuple[str | None, str | None]]:
+    """Ask Gemini to classify and rename multiple items in a single compact call."""
+
     style = rename_config.get("style", "kebab-case")
     max_length = int(rename_config.get("max_length", 80))
     taxonomy = rename_config.get("taxonomy", "{categoria}/{nome-curto}")
@@ -592,6 +628,8 @@ def collect_ai_decisions(
     *,
     use_ai: bool,
 ) -> dict[Path, tuple[str | None, str | None]]:
+    """Collect AI decisions in batches, falling back silently when allowed."""
+
     if not bool(ai_config.get("batch_enabled", True)):
         return {}
 
@@ -660,6 +698,8 @@ def collect_structure(
     protected_names: set[str],
     protected_patterns: list[str],
 ) -> list[dict[str, Any]]:
+    """Collect a bounded, protected-safe tree snapshot for architect mode."""
+
     max_items = int(restructure_config.get("max_scan_items", 300))
     max_scan_depth = int(restructure_config.get("max_scan_depth", 5))
     items: list[dict[str, Any]] = []
@@ -711,6 +751,8 @@ def ask_gemini_for_restructure_plan(
     restructure_config: dict[str, Any],
     context_config: dict[str, Any],
 ) -> dict[str, Any]:
+    """Ask Gemini for a full hierarchy plan using compact JSON context."""
+
     max_depth = int(restructure_config.get("max_depth", 3))
     max_output_tokens = int(restructure_config.get("max_output_tokens", 8192))
     global_hints = context_config.get("global_hints", [])
@@ -756,6 +798,8 @@ def add_structural_move(
     protected_names: set[str],
     protected_patterns: list[str],
 ) -> None:
+    """Add a structural move after validating depth, protection, and collisions."""
+
     source = resolve_inside_root(root, source_relative)
     destination = resolve_inside_root(root, destination_relative)
 
@@ -797,6 +841,8 @@ def validate_restructure_plan(
     protected_names: set[str] | None = None,
     protected_patterns: list[str] | None = None,
 ) -> RestructurePlan:
+    """Convert untrusted AI JSON into a safe, executable restructure plan."""
+
     max_depth = int(restructure_config.get("max_depth", 3))
     protected_names = protected_names or set()
     protected_patterns = protected_patterns or []
@@ -1116,6 +1162,8 @@ def protected_directory_names(config: dict[str, Any], extension_rules: dict[str,
 
 
 def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
+    """Create the normal one-level organization plan for source_dir."""
+
     source_dir = expand_path(config["source_dir"])
     target_root = expand_path(config.get("target_root") or config["source_dir"])
     ignored_names = set(config.get("ignored_names", []))
@@ -1264,6 +1312,8 @@ def write_reports(
     folders_to_create: list[Path] | None = None,
     reasoning: str = "",
 ) -> tuple[Path, Path]:
+    """Write human-readable Markdown and HTML reports for a planned run."""
+
     folders_to_create = folders_to_create or []
     md_path, html_path = report_paths(kind, dry_run)
     mode = "simulacao" if dry_run else "aplicado"
@@ -1381,6 +1431,8 @@ def write_undo_manifest(
     moves: list[MovePlan],
     created_dirs: list[Path],
 ) -> Path:
+    """Persist enough information to reverse a successful apply run later."""
+
     log_dir = Path(LOG_DIR)
     log_dir.mkdir(exist_ok=True)
     path = log_dir / f"undo_{mode}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
@@ -1412,6 +1464,8 @@ def load_undo_manifest(path: Path) -> dict[str, Any]:
 
 
 def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int) -> None:
+    """Reverse a previous apply run from its undo manifest."""
+
     manifest = load_undo_manifest(manifest_path)
     moves = list(reversed(manifest.get("moves", [])))
     created_dirs = [Path(value) for value in manifest.get("created_dirs", [])]
@@ -1502,6 +1556,8 @@ def text_prompt(question: str, *, default: str) -> str:
 
 
 def run_wizard() -> None:
+    """Create a small profile interactively without asking users to edit JSON."""
+
     print("\nAssistente de configuracao")
     print("--------------------------")
     folder = text_prompt("Pasta para organizar", default="~/Downloads")
@@ -1545,6 +1601,8 @@ def doctor_check(label: str, ok: bool, detail: str = "") -> bool:
 
 
 def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> None:
+    """Print a non-mutating health check for configuration and environment."""
+
     print("\nDiagnostico do organizador")
     print("--------------------------")
     print(f"Configuracao: {config_path}")
