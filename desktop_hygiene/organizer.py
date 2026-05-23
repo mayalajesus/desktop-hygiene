@@ -717,6 +717,8 @@ def ask_gemini_for_batch_organization(
 
     prompt = (
         "Organize itens de computador considerando contexto, dominio e filhos de pastas. "
+        "A categoria define a pasta principal e, quando existir, a subpasta. "
+        "Prefira a categoria mais especifica permitida; use categoria raiz so quando nenhuma subcategoria servir. "
         "Responda SOMENTE JSON compacto.\n"
         f"Categorias permitidas: {categories}\n"
         f"{hint_text}"
@@ -1142,6 +1144,7 @@ def ask_gemini_for_category(item: Path, ai_config: dict[str, Any], allowed_categ
     prompt = (
         "Voce organiza arquivos e pastas pessoais de um computador Windows. "
         "Escolha exatamente uma categoria da lista permitida para este item. "
+        "Prefira a categoria mais especifica; a primeira parte e a pasta principal da taxonomia. "
         "Use o nome, tipo e metadados como pistas. Nao invente categorias. "
         "Responda somente com o nome exato da categoria.\n\n"
         f"Categorias permitidas: {categories}\n"
@@ -1175,6 +1178,8 @@ def ask_gemini_for_organization(
     prompt = (
         "Voce e um assistente de organizacao de arquivos pessoais no Windows. "
         "Escolha uma categoria permitida e proponha um nome coerente, humano e padronizado. "
+        "A categoria escolhida define a pasta principal e a subpasta da taxonomia. "
+        "Prefira categorias especificas como Dev/Python, Jogos/Mods ou Pessoal/WhatsApp quando o contexto indicar. "
         "Nao invente dados que nao estejam no nome ou nos metadados. "
         "Prefira nomes curtos, descritivos e sem informacao sensivel desnecessaria. "
         f"Padrao de taxonomia: {taxonomy}. "
@@ -1292,13 +1297,27 @@ def choose_destination_details(
 
 
 def protected_directory_names(config: dict[str, Any], extension_rules: dict[str, str]) -> set[str]:
-    names = set(extension_rules.values())
+    names: set[str] = set()
+
+    def add_taxonomy_path(value: Any) -> None:
+        if not value:
+            return
+        path = Path(str(value).replace("/", "\\"))
+        parts = [part for part in path.parts if part not in ("", ".")]
+        if parts:
+            names.add(parts[0])
+            names.add(str(Path(*parts)))
+
+    for folder_name in extension_rules.values():
+        add_taxonomy_path(folder_name)
+
     default_folder = config.get("default_folder")
-    if default_folder:
-        names.add(default_folder)
+    add_taxonomy_path(default_folder)
 
     ai_config = config.get("ai", {})
-    names.update(ai_config.get("categories", []))
+    for category in ai_config.get("categories", []):
+        add_taxonomy_path(category)
+
     return names
 
 

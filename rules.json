@@ -27,7 +27,7 @@
       "target_root": "~/Desktop"
     }
   },
-  "default_folder": "Outros",
+  "default_folder": "Revisar",
   "ai": {
     "enabled": true,
     "model": "gemini-2.5-flash-lite",
@@ -40,31 +40,50 @@
     "retry_delay_seconds": 2,
     "fail_on_error": false,
     "categories": [
-      "Trabalho",
-      "Financas",
-      "Estudos",
-      "Projetos",
-      "Pessoal",
-      "Viagens",
-      "Saude",
-      "Compras",
-      "Jogos",
-      "Jogos/Mods",
-      "Jogos/Saves",
+      "Trabalho/Clientes",
+      "Trabalho/Relatorios",
+      "Trabalho/Reunioes",
+      "Trabalho/Marketing",
+      "Trabalho/Operacional",
       "Dev/Python",
       "Dev/Projetos",
       "Dev/Repositorios",
       "Dev/Notebooks",
+      "Dev/APIs",
+      "Dev/Banco de Dados",
       "Dev/Documentacao",
       "Dev/Ferramentas",
-      "Documentos",
-      "Imagens",
-      "Videos",
-      "Audio",
-      "Compactados",
-      "Instaladores",
-      "Codigo",
-      "Outros"
+      "Dev/Codigo",
+      "Jogos/Mods",
+      "Jogos/Saves",
+      "Jogos/Launchers",
+      "Jogos/Capturas",
+      "Jogos/Configuracoes",
+      "Documentos/Geral",
+      "Documentos/Contratos",
+      "Documentos/Financeiro",
+      "Documentos/Comprovantes",
+      "Documentos/Planilhas",
+      "Documentos/Apresentacoes",
+      "Documentos/Identidade",
+      "Estudos/Cursos",
+      "Estudos/Livros",
+      "Estudos/Anotacoes",
+      "Estudos/Certificados",
+      "Midia/Imagens",
+      "Midia/Videos",
+      "Midia/Audio",
+      "Midia/Design",
+      "Pessoal/WhatsApp",
+      "Pessoal/Fotos",
+      "Pessoal/Saude",
+      "Pessoal/Viagens",
+      "Pessoal/Compras",
+      "Sistemas/Instaladores",
+      "Sistemas/Drivers",
+      "Sistemas/Compactados",
+      "Sistemas/Ferramentas",
+      "Revisar"
     ]
   },
   "rename": {
@@ -73,15 +92,20 @@
     "rename_folders": true,
     "style": "kebab-case",
     "max_length": 80,
-    "taxonomy": "{categoria}/{aaaa-mm-dd-quando-claro}-{assunto-curto}",
+    "taxonomy": "{pasta-principal}/{subpasta}/{aaaa-mm-dd-quando-claro}-{assunto-curto}",
     "date_policy": "include_when_clear"
   },
   "context": {
     "global_hints": [
       "Publico-alvo: programadores Python, desenvolvedores e gamers.",
-      "Quando o item for codigo, projeto, repo, script, notebook, pacote, SDK ou documentacao tecnica, prefira categorias Dev/*.",
-      "Quando o item for relacionado a jogos, mods, launchers, saves, resource packs ou mod loaders, prefira categorias Jogos/*.",
-      "Proteja workspaces, repositorios e pastas operacionais. Organize instaladores, zips, exports e arquivos soltos.",
+      "A primeira parte da categoria e a pasta principal da taxonomia: Dev, Jogos, Trabalho, Documentos, Midia, Pessoal, Estudos, Sistemas ou Revisar.",
+      "Escolha sempre a categoria mais especifica permitida. Evite usar Revisar quando houver contexto suficiente.",
+      "Codigo, repositorios, scripts, notebooks, APIs, bancos de dados, SDKs e documentacao tecnica pertencem a Dev/*.",
+      "Mods, SMAPI, Forge, Fabric, saves, launchers, clips e capturas de gameplay pertencem a Jogos/*.",
+      "WhatsApp Image, WhatsApp Video e midias de conversa pessoal pertencem a Pessoal/WhatsApp, exceto quando o nome indicar trabalho.",
+      "Contratos, boletos, comprovantes, planilhas e apresentacoes devem ir para Documentos/* conforme a funcao.",
+      "Instaladores, drivers, zips, ferramentas portateis e pacotes baixados pertencem a Sistemas/*.",
+      "Proteja workspaces, repositorios e pastas operacionais. Organize instaladores, exports e arquivos soltos.",
       "Padronize nomes em portugues claro, preservando nomes proprios tecnicos como Django, FastAPI, PyTorch, SMAPI, Forge e Fabric."
     ],
     "max_folder_children": 12,
@@ -260,18 +284,22 @@
     "Visual Studio*"
   ],
   "extension_rules": {
-    "Documentos": [
+    "Documentos/Geral": [
       ".pdf",
       ".doc",
       ".docx",
-      ".txt",
+      ".txt"
+    ],
+    "Documentos/Planilhas": [
       ".xlsx",
       ".xls",
-      ".csv",
+      ".csv"
+    ],
+    "Documentos/Apresentacoes": [
       ".ppt",
       ".pptx"
     ],
-    "Imagens": [
+    "Midia/Imagens": [
       ".jpg",
       ".jpeg",
       ".png",
@@ -279,30 +307,30 @@
       ".webp",
       ".svg"
     ],
-    "Videos": [
+    "Midia/Videos": [
       ".mp4",
       ".mov",
       ".avi",
       ".mkv"
     ],
-    "Audio": [
+    "Midia/Audio": [
       ".mp3",
       ".wav",
       ".m4a",
       ".flac"
     ],
-    "Compactados": [
+    "Sistemas/Compactados": [
       ".zip",
       ".rar",
       ".7z",
       ".tar",
       ".gz"
     ],
-    "Instaladores": [
+    "Sistemas/Instaladores": [
       ".exe",
       ".msi"
     ],
-    "Codigo": [
+    "Dev/Codigo": [
       ".py",
       ".ipynb",
       ".js",

@@ -73,6 +73,23 @@ Use `--folder` quando quiser pular a pergunta interativa.
 
 Perfis continuam disponiveis em `profiles/` para casos avancados.
 
+### Taxonomia
+
+O organizador usa uma taxonomia simples de duas camadas:
+
+```text
+Pasta principal/Subpasta/arquivo-padronizado.ext
+```
+
+Exemplos:
+
+- `Dev/Python/api-fastapi.py`
+- `Jogos/Mods/smapi-stardew-valley.zip`
+- `Pessoal/WhatsApp/2026-01-13-whatsapp-image.jpeg`
+- `Documentos/Contratos/2026-01-07-contrato-assinado.pdf`
+
+As pastas principais da taxonomia sao protegidas em execucoes futuras, entao o app nao tenta reorganizar `Dev`, `Jogos`, `Midia`, `Documentos` e similares depois de cria-las.
+
 ### Wizard
 
 Crie um perfil sem editar JSON:
