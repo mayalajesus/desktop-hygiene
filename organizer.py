@@ -119,6 +119,33 @@ def apply_folder_choice(config: dict[str, Any], folder_name: str) -> dict[str, A
     return deep_merge(config, folder_config)
 
 
+def prompt_folder_choice(config: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    folders = available_folders(config)
+    if not folders:
+        return config, None
+
+    print("\nQual pasta voce quer organizar?")
+    for index, name in enumerate(folders, start=1):
+        source = config["folders"][name].get("source_dir", "")
+        print(f"{index}. {name} ({source})")
+
+    default_index = folders.index("downloads") + 1 if "downloads" in folders else 1
+    default_name = folders[default_index - 1]
+    answer = input(f"Escolha [1-{len(folders)}] ou Enter para {default_name}: ").strip()
+    if not answer:
+        selected = folders[default_index - 1]
+    else:
+        try:
+            selected_index = int(answer)
+        except ValueError as error:
+            raise ValueError("Escolha de pasta invalida.") from error
+        if selected_index < 1 or selected_index > len(folders):
+            raise ValueError("Escolha de pasta fora da lista.")
+        selected = folders[selected_index - 1]
+
+    return apply_folder_choice(config, selected), selected
+
+
 def load_config_for_args(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
     base_path = Path(args.config)
     config = load_config(base_path)
@@ -1788,6 +1815,10 @@ def main() -> None:
     config, config_path = load_config_for_args(args)
     if args.folder:
         config = apply_folder_choice(config, args.folder)
+    elif not args.doctor:
+        config, selected_folder = prompt_folder_choice(config)
+        if selected_folder:
+            print(f"Pasta selecionada: {selected_folder}")
     source_dir = expand_path(config["source_dir"])
     target_root = expand_path(config.get("target_root") or config["source_dir"])
 
