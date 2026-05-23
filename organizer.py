@@ -131,7 +131,10 @@ def prompt_folder_choice(config: dict[str, Any]) -> tuple[dict[str, Any], str | 
 
     default_index = folders.index("downloads") + 1 if "downloads" in folders else 1
     default_name = folders[default_index - 1]
-    answer = input(f"Escolha [1-{len(folders)}] ou Enter para {default_name}: ").strip()
+    try:
+        answer = input(f"Escolha [1-{len(folders)}] ou Enter para {default_name}: ").strip()
+    except EOFError:
+        answer = ""
     if not answer:
         selected = folders[default_index - 1]
     else:
@@ -253,20 +256,37 @@ def matches_ignored_pattern(path: Path, ignored_patterns: list[str]) -> bool:
     )
 
 
+def comparison_key(value: str) -> str:
+    """Return a case/accent-insensitive key for human-facing names."""
+
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    return ascii_value.casefold()
+
+
 def matches_pattern(path: Path, patterns: list[str]) -> bool:
     normalized = str(path).replace("\\", "/")
-    return any(
-        fnmatch.fnmatch(path.name.casefold(), pattern.casefold())
-        or fnmatch.fnmatch(normalized.casefold(), pattern.replace("\\", "/").casefold())
-        for pattern in patterns
-    )
+    name_key = comparison_key(path.name)
+    path_key = comparison_key(normalized)
+
+    for pattern in patterns:
+        normalized_pattern = pattern.replace("\\", "/")
+        if fnmatch.fnmatch(path.name.casefold(), pattern.casefold()):
+            return True
+        if fnmatch.fnmatch(normalized.casefold(), normalized_pattern.casefold()):
+            return True
+        if fnmatch.fnmatch(name_key, comparison_key(pattern)):
+            return True
+        if fnmatch.fnmatch(path_key, comparison_key(normalized_pattern)):
+            return True
+    return False
 
 
 def is_protected_path(relative_path: Path, protected_names: set[str], protected_patterns: list[str]) -> bool:
     """Return true when a relative path touches a user/software protected area."""
 
-    protected_names_normalized = {name.casefold() for name in protected_names}
-    if any(part.casefold() in protected_names_normalized for part in relative_path.parts):
+    protected_names_normalized = {comparison_key(name) for name in protected_names}
+    if any(comparison_key(part) in protected_names_normalized for part in relative_path.parts):
         return True
     if any(matches_pattern(Path(part), protected_patterns) for part in relative_path.parts):
         return True
@@ -286,12 +306,12 @@ def looks_like_software_folder(path: Path, auto_config: dict[str, Any]) -> tuple
     if not path.is_dir() or not auto_config.get("enabled", True):
         return False, ""
 
-    name = path.name.casefold()
-    names = [value.casefold() for value in auto_config.get("names", [])]
-    keywords = [value.casefold() for value in auto_config.get("keywords", [])]
-    child_markers = [value.casefold() for value in auto_config.get("child_markers", [])]
+    name = comparison_key(path.name)
+    names = [comparison_key(value) for value in auto_config.get("names", [])]
+    keywords = [comparison_key(value) for value in auto_config.get("keywords", [])]
+    child_markers = [comparison_key(value) for value in auto_config.get("child_markers", [])]
     children = child_names(path)
-    child_text = " ".join(children).casefold()
+    child_text = comparison_key(" ".join(children))
 
     if name in names:
         return True, "nome conhecido de software/sistema"
@@ -351,9 +371,20 @@ def unique_destination(destination: Path) -> Path:
         counter += 1
 
 
+def destination_key(path: Path) -> str:
+    """Normalize a destination path for collision checks on Windows."""
+
+    try:
+        normalized = str(path.resolve(strict=False))
+    except OSError:
+        normalized = str(path.absolute())
+    return os.path.normcase(normalized).casefold()
+
+
 def unique_planned_destination(destination: Path, planned_destinations: set[Path]) -> Path:
     candidate = unique_destination(destination)
-    if candidate not in planned_destinations:
+    planned_keys = {destination_key(path) for path in planned_destinations}
+    if destination_key(candidate) not in planned_keys:
         return candidate
 
     counter = 1
@@ -363,7 +394,7 @@ def unique_planned_destination(destination: Path, planned_destinations: set[Path
 
     while True:
         candidate = parent / f"{stem} ({counter}){suffix}"
-        if not candidate.exists() and candidate not in planned_destinations:
+        if not candidate.exists() and destination_key(candidate) not in planned_keys:
             return candidate
         counter += 1
 
@@ -1278,6 +1309,7 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         raise FileNotFoundError(f"Pasta de origem nao encontrada: {source_dir}")
 
     plans: list[MovePlan] = []
+    planned_destinations: set[Path] = set()
     items: list[Path] = []
     skipped = 0
     protected_skipped = 0
@@ -1347,7 +1379,8 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         except OSError:
             pass
 
-        destination = unique_destination(raw_destination)
+        destination = unique_planned_destination(raw_destination, planned_destinations)
+        planned_destinations.add(destination)
         plans.append(MovePlan(item, destination, reason))
 
     return plans
@@ -1652,15 +1685,39 @@ def apply_plan(
 
 def yes_no_prompt(question: str, *, default: bool) -> bool:
     suffix = "S/n" if default else "s/N"
-    answer = input(f"{question} [{suffix}]: ").strip().casefold()
+    try:
+        answer = input(f"{question} [{suffix}]: ").strip().casefold()
+    except EOFError:
+        answer = ""
     if not answer:
         return default
     return answer in {"s", "sim", "y", "yes"}
 
 
 def text_prompt(question: str, *, default: str) -> str:
-    answer = input(f"{question} [{default}]: ").strip()
+    try:
+        answer = input(f"{question} [{default}]: ").strip()
+    except EOFError:
+        answer = ""
     return answer or default
+
+
+def sanitize_profile_name(value: str) -> str:
+    return slugify_name(value, separator="-", max_length=48)
+
+
+def unique_profile_path(name: str) -> Path:
+    clean_name = sanitize_profile_name(name)
+    target = profile_path(clean_name)
+    if not target.exists():
+        return target
+
+    counter = 2
+    while True:
+        candidate = profile_path(f"{clean_name}-{counter}")
+        if not candidate.exists():
+            return candidate
+        counter += 1
 
 
 def run_wizard() -> None:
@@ -1669,7 +1726,8 @@ def run_wizard() -> None:
     print("\nAssistente de configuracao")
     print("--------------------------")
     folder = text_prompt("Pasta para organizar", default="~/Downloads")
-    profile_name = text_prompt("Nome do perfil", default=Path(folder).name.lower() or "custom")
+    raw_profile_name = text_prompt("Nome do perfil", default=Path(folder).name.lower() or "custom")
+    profile_name = sanitize_profile_name(raw_profile_name)
     use_ai = yes_no_prompt("Usar IA", default=True)
     rename = yes_no_prompt("Renomear com padrao", default=True)
     protect_software = yes_no_prompt("Proteger pastas de software/sistema", default=True)
@@ -1690,10 +1748,12 @@ def run_wizard() -> None:
             ".obsidian",
         ]
 
-    target = profile_path(profile_name)
+    target = unique_profile_path(profile_name)
     target.parent.mkdir(exist_ok=True)
-    target.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    target.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    if target.stem != profile_name:
+        print(f"[AVISO] perfil existente preservado; novo perfil salvo como {target.stem}")
     print_done(f"perfil criado em {target}")
     print(f"Teste com: python organizer.py --profile {target.stem}")
     print(f"Aplique com: python organizer.py --profile {target.stem} --apply")

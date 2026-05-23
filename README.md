@@ -103,7 +103,6 @@ O app tenta detectar isso sozinho usando sinais locais:
 - nomes como `GitHub`, `Codex`, `My Games`
 - padroes como `*SharedFolder`
 - filhos como `.git`, `.vscode`, `node_modules`, `package.json`
-- arquivos operacionais como `.exe`, `.dll`, `.bat`, `.ps1`
 - palavras como `workspace`, `saves`, `config`, `settings`
 
 Isso fica em `auto_protect` no `rules.json` e vem ligado por padrao.
