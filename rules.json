@@ -1,0 +1,196 @@
+{
+  "source_dir": "~/Downloads",
+  "target_root": "~/Downloads",
+  "default_folder": "Outros",
+  "ai": {
+    "enabled": true,
+    "model": "gemini-2.5-flash-lite",
+    "classify_known_extensions": true,
+    "batch_enabled": true,
+    "batch_size": 20,
+    "batch_max_output_tokens": 1400,
+    "timeout_seconds": 20,
+    "retry_attempts": 2,
+    "retry_delay_seconds": 2,
+    "fail_on_error": false,
+    "categories": [
+      "Trabalho",
+      "Financas",
+      "Estudos",
+      "Projetos",
+      "Pessoal",
+      "Viagens",
+      "Saude",
+      "Compras",
+      "Jogos",
+      "Jogos/Mods",
+      "Documentos",
+      "Imagens",
+      "Videos",
+      "Audio",
+      "Compactados",
+      "Instaladores",
+      "Codigo",
+      "Outros"
+    ]
+  },
+  "rename": {
+    "enabled": true,
+    "rename_files": true,
+    "rename_folders": true,
+    "style": "kebab-case",
+    "max_length": 80,
+    "taxonomy": "{categoria}/{aaaa-mm-dd-quando-claro}-{assunto-curto}",
+    "date_policy": "include_when_clear"
+  },
+  "context": {
+    "global_hints": [
+      "Quando o item for relacionado a jogos, mods, launchers ou mod loaders, prefira categorias Jogos ou Jogos/Mods.",
+      "Padronize nomes em portugues claro, mantendo nomes proprios tecnicos quando eles identificam o item."
+    ],
+    "max_folder_children": 12,
+    "max_hints_per_item": 4,
+    "glossary": {
+      "SMAPI": "Stardew Modding API; mod loader/framework usado para mods do jogo Stardew Valley. Classifique como Jogos/Mods e preserve SMAPI no nome padronizado.",
+      "Stardew": "Jogo Stardew Valley. Conteudo relacionado normalmente pertence a Jogos ou Jogos/Mods.",
+      "mod": "Modificacao de jogo. Classifique como Jogos/Mods quando o contexto indicar jogo.",
+      "mods": "Pasta ou pacote de modificacoes de jogo. Classifique como Jogos/Mods.",
+      "Minecraft": "Jogo; arquivos de mods, resource packs ou shaders pertencem a Jogos/Mods.",
+      "Forge": "Mod loader de Minecraft. Classifique como Jogos/Mods.",
+      "Fabric": "Mod loader de Minecraft. Classifique como Jogos/Mods.",
+      "CurseForge": "Gerenciador/plataforma de mods. Classifique como Jogos/Mods."
+    }
+  },
+  "restructure": {
+    "enabled": true,
+    "max_depth": 3,
+    "max_scan_depth": 5,
+    "max_scan_items": 180,
+    "max_output_tokens": 4096
+  },
+  "ignored_names": [
+    "desktop.ini"
+  ],
+  "ignored_patterns": [
+    ".tmp.*",
+    "*.tmp",
+    "*.crdownload",
+    "*.part",
+    "~$*"
+  ],
+  "protected_names": [
+    "Adobe",
+    "AdobeStock",
+    "AndroidStudioProjects",
+    "Arduino",
+    "Autodesk",
+    "Battlefield 2042",
+    "BioWare",
+    "Blackmagic Design",
+    "Bluetooth Folder",
+    "Call of Duty",
+    "Codex",
+    "Custom Office Templates",
+    "DBeaverData",
+    "Darmoshark Mouse Files",
+    "Electronic Arts",
+    "Euro Truck Simulator 2",
+    "FIFA 23",
+    "GitHub",
+    "GTA San Andreas User Files",
+    "Meus Vídeos",
+    "Minhas Imagens",
+    "Minhas Músicas",
+    "MuMuSharedFolder",
+    "My Games",
+    "My Music",
+    "My Pictures",
+    "My Videos",
+    "NebulaSharedFolder",
+    "NVIDIA",
+    "Paradox Interactive",
+    "Power BI Desktop",
+    "Rockstar Games",
+    "SQL Server Management Studio",
+    "Sports Interactive",
+    "The Witcher 3",
+    "Visual Studio 2022",
+    "Visual Studio Code",
+    "Zoom"
+  ],
+  "protected_patterns": [
+    "*.code-workspace",
+    ".obsidian",
+    ".vscode",
+    "Adobe*",
+    "Autodesk*",
+    "Blackmagic*",
+    "*SharedFolder",
+    "* Mouse Files",
+    "DBeaverData*",
+    "Darmoshark*",
+    "GitHub*",
+    "Meus Vídeos*",
+    "Minhas Imagens*",
+    "Minhas Músicas*",
+    "MuMu*",
+    "My Games*",
+    "Nebula*",
+    "Power BI Desktop*",
+    "Rockstar Games*",
+    "Visual Studio*"
+  ],
+  "extension_rules": {
+    "Documentos": [
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".txt",
+      ".xlsx",
+      ".xls",
+      ".csv",
+      ".ppt",
+      ".pptx"
+    ],
+    "Imagens": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".webp",
+      ".svg"
+    ],
+    "Videos": [
+      ".mp4",
+      ".mov",
+      ".avi",
+      ".mkv"
+    ],
+    "Audio": [
+      ".mp3",
+      ".wav",
+      ".m4a",
+      ".flac"
+    ],
+    "Compactados": [
+      ".zip",
+      ".rar",
+      ".7z",
+      ".tar",
+      ".gz"
+    ],
+    "Instaladores": [
+      ".exe",
+      ".msi"
+    ],
+    "Codigo": [
+      ".py",
+      ".js",
+      ".ts",
+      ".html",
+      ".css",
+      ".json",
+      ".xml"
+    ]
+  }
+}
