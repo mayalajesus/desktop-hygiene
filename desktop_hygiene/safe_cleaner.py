@@ -34,6 +34,35 @@ DEFAULT_PREVIEW_LIMIT = 30
 DEFAULT_OLDER_THAN_DAYS = 7
 DEFAULT_CATEGORIES = ("temp", "recycle", "browsers", "apps")
 ALL_CATEGORIES = ("temp", "recycle", "browsers", "apps", "registry")
+QUIET = False
+VERBOSE = False
+COLOR_ENABLED = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+CLEANER_EXAMPLES = """Exemplos reais:
+  python safe_cleaner.py preview
+  python safe_cleaner.py apply --only temp browsers --yes
+  python safe_cleaner.py browsers
+  python safe_cleaner.py registry --apply --yes
+
+Comandos semanticos:
+  preview, scan     Simula a limpeza
+  apply, clean      Executa limpeza; pede confirmacao sem --yes
+  temp              Simula apenas temporarios
+  browsers          Simula caches de navegadores
+  apps              Simula caches de apps
+  recycle           Simula Lixeira
+  registry          Simula Registro; remocao exige --apply e --include-registry
+"""
+
+CATEGORY_ALIASES = {
+    "browser": "browsers",
+    "nav": "browsers",
+    "cache": "apps",
+    "app": "apps",
+    "trash": "recycle",
+    "lixeira": "recycle",
+    "reg": "registry",
+}
 
 
 @dataclass(frozen=True)
@@ -150,13 +179,37 @@ def format_count(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {plural or singular + 's'}"
 
 
+def color(text: str, code: str) -> str:
+    if not COLOR_ENABLED:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def print_line(message: str = "", *, force: bool = False) -> None:
+    if not QUIET or force:
+        print(message)
+
+
+def verbose(message: str) -> None:
+    if VERBOSE and not QUIET:
+        print(color(f"debug: {message}", "2"))
+
+
+def configure_cli(args: argparse.Namespace) -> None:
+    global COLOR_ENABLED, QUIET, VERBOSE
+    QUIET = bool(getattr(args, "quiet", False))
+    VERBOSE = bool(getattr(args, "verbose", False))
+    if getattr(args, "no_color", False):
+        COLOR_ENABLED = False
+
+
 def print_header(title: str, *, dry_run: bool, categories: list[str], older_than_days: int) -> None:
     mode = "simulacao" if dry_run else "aplicacao"
-    print(f"\n{title}")
-    print("-" * len(title))
-    print(f"Modo: {mode}")
-    print(f"Categorias: {', '.join(categories)}")
-    print(f"Idade minima: {older_than_days} dias")
+    print_line(f"\n{color(title, '1;36')}")
+    print_line(color("-" * len(title), "36"))
+    print_line(f"Modo: {color(mode, '32' if dry_run else '33')}")
+    print_line(f"Categorias: {', '.join(categories)}")
+    print_line(f"Idade minima: {older_than_days} dias")
 
 
 def get_running_processes() -> set[str]:
@@ -578,26 +631,26 @@ def print_summary(actions: list[CleanAction], preview_limit: int) -> None:
     registry_count = sum(1 for action in actions if action.category == "registry")
     disk_actions = [action for action in actions if action.category != "registry"]
 
-    print(f"\nLimpezas planejadas: {format_count(len(actions), 'acao', 'acoes')}")
-    print(f"Espaco estimado: {format_size(total_size)}")
+    print_line(f"\nLimpezas planejadas: {format_count(len(actions), 'acao', 'acoes')}")
+    print_line(f"Espaco estimado: {format_size(total_size)}")
     if registry_count:
-        print(f"Registro: {format_count(registry_count, 'entrada orfa', 'entradas orfas')}")
+        print_line(f"Registro: {format_count(registry_count, 'entrada orfa', 'entradas orfas')}")
 
     for action in actions[:preview_limit]:
         size = "" if action.category == "registry" else f" ({format_size(action.size_bytes)})"
-        print(f"limpar: [{action.category}] {action.target}{size}")
+        print_line(f"limpar: [{action.category}] {action.target}{size}")
 
     remaining = len(actions) - min(len(actions), preview_limit)
     if remaining > 0:
-        print(f"...mais {format_count(remaining, 'acao', 'acoes')} no log completo")
+        print_line(f"...mais {format_count(remaining, 'acao', 'acoes')} no log completo")
 
     if not disk_actions and not registry_count:
-        print("Nada para limpar com os filtros atuais.")
+        print_line("Nada para limpar com os filtros atuais.")
 
 
 def print_results(results: list[CleanResult], *, dry_run: bool) -> None:
     if not results:
-        print("\nOK: nada para limpar com os filtros atuais.")
+        print_line("\nOK: nada para limpar com os filtros atuais.", force=True)
         return
 
     applied = sum(1 for result in results if result.status == "aplicado")
@@ -605,21 +658,64 @@ def print_results(results: list[CleanResult], *, dry_run: bool) -> None:
     simulated = sum(1 for result in results if result.status == "simulado")
 
     if dry_run:
-        print(f"\nOK: simulacao concluida para {format_count(simulated, 'acao', 'acoes')}. Use --apply para limpar.")
+        print_line(f"\nOK: simulacao concluida para {format_count(simulated, 'acao', 'acoes')}. Use --apply para limpar.", force=True)
         return
 
-    print(f"\nOK: {format_count(applied, 'acao aplicada', 'acoes aplicadas')}.")
+    print_line(f"\nOK: {format_count(applied, 'acao aplicada', 'acoes aplicadas')}.", force=True)
     if failed:
-        print(f"Avisos: {format_count(failed, 'acao falhou', 'acoes falharam')}. Confira o log.")
+        print_line(f"Avisos: {format_count(failed, 'acao falhou', 'acoes falharam')}. Confira o log.", force=True)
+
+
+def normalize_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return argv
+    command = argv[0].casefold()
+    if command in {"preview", "scan"}:
+        return argv[1:]
+    if command in {"apply", "clean"}:
+        return ["--apply", *argv[1:]]
+    category = CATEGORY_ALIASES.get(command, command)
+    if category in ALL_CATEGORIES:
+        extra = ["--include-registry"] if category == "registry" else []
+        return ["--only", category, *extra, *argv[1:]]
+    if command == "examples":
+        return ["--examples", *argv[1:]]
+    if command == "completion":
+        return ["--completion", *argv[1:]]
+    return argv
+
+
+def print_examples() -> None:
+    print(CLEANER_EXAMPLES.strip())
+
+
+def print_completion() -> None:
+    commands = "preview scan apply clean temp browsers apps recycle registry examples completion"
+    options = "--only --include-registry --older-than-days --force-open-apps --preview-limit --apply --yes --verbose --quiet --no-color"
+    print(
+        "\n".join(
+            [
+                "# PowerShell autocomplete simples",
+                "Register-ArgumentCompleter -Native -CommandName python -ScriptBlock {",
+                "  param($wordToComplete)",
+                f"  '{commands} {options}'.Split(' ') | Where-Object {{ $_ -like \"$wordToComplete*\" }}",
+                "}",
+            ]
+        )
+    )
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Limpa arquivos tecnicos do Windows com simulacao por padrao.")
+    parser = argparse.ArgumentParser(
+        description="Limpa caches e temporarios do Windows com simulacao segura.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=CLEANER_EXAMPLES,
+    )
     parser.add_argument("--apply", action="store_true", help="Executa a limpeza de verdade. Sem isso, apenas simula.")
+    parser.add_argument("-y", "--yes", action="store_true", help="Confirma a limpeza real sem pergunta interativa.")
     parser.add_argument(
         "--only",
         nargs="+",
-        choices=ALL_CATEGORIES,
         help="Limita a limpeza a categorias especificas: temp recycle browsers apps registry.",
     )
     parser.add_argument(
@@ -644,21 +740,52 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_PREVIEW_LIMIT,
         help=f"Quantidade maxima de acoes exibidas no terminal. Padrao: {DEFAULT_PREVIEW_LIMIT}.",
     )
-    return parser.parse_args()
+    parser.add_argument("--examples", action="store_true", help="Mostra exemplos reais de uso.")
+    parser.add_argument("--completion", action="store_true", help="Mostra autocomplete simples para PowerShell.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Mostra detalhes extras de execucao.")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Reduz o output no terminal.")
+    parser.add_argument("--no-color", action="store_true", help="Desativa cores ANSI.")
+    return parser.parse_args(normalize_argv(sys.argv[1:]))
 
 
 def selected_categories(args: argparse.Namespace) -> list[str]:
-    categories = list(args.only or DEFAULT_CATEGORIES)
+    categories = []
+    for category in list(args.only or DEFAULT_CATEGORIES):
+        normalized = CATEGORY_ALIASES.get(category.casefold(), category.casefold())
+        if normalized not in ALL_CATEGORIES:
+            allowed = ", ".join(ALL_CATEGORIES)
+            raise ValueError(f"Categoria desconhecida: {category}. Use: {allowed}")
+        if normalized not in categories:
+            categories.append(normalized)
     if args.include_registry and "registry" not in categories:
         categories.append("registry")
     return categories
 
 
+def confirm_apply(actions: list[CleanAction], *, yes: bool) -> None:
+    if yes or not actions:
+        return
+    total_size = format_size(sum(action.size_bytes for action in actions))
+    print_line(color(f"AVISO: limpeza real vai aplicar {format_count(len(actions), 'acao', 'acoes')} ({total_size}).", "33"), force=True)
+    try:
+        answer = input("Digite limpar para continuar: ").strip().casefold()
+    except EOFError as error:
+        raise RuntimeError("Confirmacao interativa indisponivel. Use --yes em automacoes.") from error
+    if answer != "limpar":
+        raise RuntimeError("Operacao cancelada. Nada foi apagado.")
+
+
 def main() -> None:
+    args = parse_args()
+    configure_cli(args)
+    if args.examples:
+        print_examples()
+        return
+    if args.completion:
+        print_completion()
+        return
     if sys.platform != "win32":
         raise RuntimeError("Este cleaner foi feito para Windows.")
-
-    args = parse_args()
     if args.older_than_days < 0:
         raise ValueError("--older-than-days nao pode ser negativo.")
 
@@ -674,27 +801,32 @@ def main() -> None:
     )
 
     if "registry" in categories:
-        print("Registro: modo conservador; backup .reg antes de remover qualquer chave.")
+        print_line("Registro: modo conservador; backup .reg antes de remover qualquer chave.")
     if dry_run:
-        print("Nada sera apagado nesta execucao.")
+        print_line("Nada sera apagado nesta execucao.")
 
+    print_line("\n> Procurando itens seguros para limpeza...")
+    verbose("Pastas pessoais e links simbolicos sao ignorados.")
     actions = collect_actions(categories, args.older_than_days, force_open_apps=args.force_open_apps)
     print_summary(actions, preview_limit)
+
+    if not dry_run:
+        confirm_apply(actions, yes=args.yes)
 
     results = [apply_action(action, dry_run=dry_run) for action in actions]
     log_path = write_log(results, dry_run=dry_run)
     print_results(results, dry_run=dry_run)
-    print(f"Log completo: {log_path}")
+    print_line(f"Log completo: {log_path}", force=True)
 
 
 def run_cli() -> int:
     try:
         main()
     except KeyboardInterrupt:
-        print("\nInterrompido pelo usuario.")
+        print_line("\nInterrompido pelo usuario.", force=True)
         return 130
     except (RuntimeError, ValueError) as error:
-        print(f"\nERRO: {error}")
+        print_line(color(f"\nERRO: {error}", "31"), force=True)
         return 1
     return 0
 

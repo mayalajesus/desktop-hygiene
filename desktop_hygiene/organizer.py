@@ -38,6 +38,43 @@ PROFILE_DIR = "config/profiles"
 REPORT_DIR = "reports"
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_PREVIEW_LIMIT = 25
+QUIET = False
+VERBOSE = False
+COLOR_ENABLED = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+ORGANIZER_EXAMPLES = """Exemplos reais:
+  python organizer.py check
+  python organizer.py run --folder downloads
+  python organizer.py apply --folder documents --yes
+  python organizer.py architect --folder downloads
+  python organizer.py undo logs/undo_organize_2026-05-23_14-00-00.json --apply
+
+Comandos semanticos:
+  run, organize     Simula a organizacao normal
+  apply             Organiza de verdade; pede confirmacao sem --yes
+  check, doctor     Verifica configuracao e ambiente
+  wizard, init      Primeira configuracao guiada
+  architect         Usa IA para reestruturar hierarquias
+  examples          Mostra exemplos
+  completion        Mostra um script simples de autocomplete PowerShell
+"""
+
+COMMAND_ALIASES = {
+    "run": [],
+    "organize": [],
+    "org": [],
+    "apply": ["--apply"],
+    "check": ["--doctor"],
+    "doctor": ["--doctor"],
+    "init": ["--wizard"],
+    "setup": ["--wizard"],
+    "wizard": ["--wizard"],
+    "architect": ["--restructure"],
+    "arch": ["--restructure"],
+    "restructure": ["--restructure"],
+    "examples": ["--examples"],
+    "completion": ["--completion"],
+}
 
 
 @dataclass(frozen=True)
@@ -111,6 +148,25 @@ def apply_folder_choice(config: dict[str, Any], folder_name: str) -> dict[str, A
             source = folder_config.get("source_dir", "")
             print(f"- {name}: {source}")
         raise SystemExit(0)
+    aliases = {
+        "d": "downloads",
+        "dl": "downloads",
+        "down": "downloads",
+        "docs": "documents",
+        "doc": "documents",
+        "images": "pictures",
+        "imgs": "pictures",
+        "fotos": "pictures",
+        "pics": "pictures",
+        "video": "videos",
+        "vids": "videos",
+        "audio": "music",
+        "musicas": "music",
+        "desk": "desktop",
+        "area-de-trabalho": "desktop",
+    }
+    folder_name = aliases.get(comparison_key(folder_name), folder_name)
+
     if folder_name not in folders:
         available = ", ".join(available_folders(config)) or "nenhuma"
         raise ValueError(f"Pasta desconhecida: {folder_name}. Disponiveis: {available}")
@@ -227,25 +283,53 @@ def format_count(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {plural or singular + 's'}"
 
 
+def color(text: str, code: str) -> str:
+    if not COLOR_ENABLED:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def print_line(message: str = "", *, force: bool = False) -> None:
+    if not QUIET or force:
+        print(message)
+
+
+def verbose(message: str) -> None:
+    if VERBOSE and not QUIET:
+        print(color(f"debug: {message}", "2"))
+
+
+def print_warning(message: str) -> None:
+    print_line(color(f"AVISO: {message}", "33"), force=True)
+
+
+def configure_cli(args: argparse.Namespace) -> None:
+    global COLOR_ENABLED, QUIET, VERBOSE
+    QUIET = bool(getattr(args, "quiet", False))
+    VERBOSE = bool(getattr(args, "verbose", False))
+    if getattr(args, "no_color", False):
+        COLOR_ENABLED = False
+
+
 def print_header(title: str, *, dry_run: bool, use_ai: bool, source_dir: Path, target_root: Path | None = None) -> None:
     mode = "simulacao" if dry_run else "aplicacao"
     ai_status = "ligada" if use_ai else "desligada"
 
-    print(f"\n{title}")
-    print("-" * len(title))
-    print(f"Modo: {mode}")
-    print(f"IA: {ai_status}")
-    print(f"Origem: {source_dir}")
+    print_line(f"\n{color(title, '1;36')}")
+    print_line(color("-" * len(title), "36"))
+    print_line(f"Modo: {color(mode, '32' if dry_run else '33')}")
+    print_line(f"IA: {ai_status}")
+    print_line(f"Origem: {source_dir}")
     if target_root and target_root != source_dir:
-        print(f"Destino base: {target_root}")
+        print_line(f"Destino base: {target_root}")
 
 
 def print_step(message: str) -> None:
-    print(f"\n> {message}")
+    print_line(f"\n{color('>', '36')} {message}")
 
 
 def print_done(message: str) -> None:
-    print(f"\nOK: {message}")
+    print_line(f"\n{color('OK:', '32')} {message}", force=True)
 
 
 def normalize_extension(extension: str) -> str:
@@ -872,7 +956,13 @@ def collect_ai_decisions(
     batch_size = max(1, int(ai_config.get("batch_size", 20)))
     decisions: dict[Path, tuple[str | None, str | None]] = {}
 
-    for batch in chunked(candidates, batch_size):
+    batches = chunked(candidates, batch_size)
+    if batches:
+        verbose(f"Gemini analisara {len(candidates)} itens em {len(batches)} lote(s).")
+
+    for index, batch in enumerate(batches, start=1):
+        if len(batches) > 1 and not QUIET:
+            print(f"IA: lote {index}/{len(batches)} ({len(batch)} itens)")
         try:
             decisions.update(
                 ask_gemini_for_batch_organization(
@@ -1194,9 +1284,9 @@ def create_restructure_plan(config: dict[str, Any]) -> RestructurePlan:
 
 def apply_restructure_plan(plan: RestructurePlan, *, dry_run: bool, preview_limit: int, display_base: Path | None = None) -> None:
     if plan.reasoning:
-        print(f"Resumo do plano: {plan.reasoning}")
+        print_line(f"Resumo do plano: {plan.reasoning}")
 
-    print(
+    print_line(
         "Mudancas planejadas: "
         f"{format_count(len(plan.folders_to_create), 'pasta criada', 'pastas criadas')}, "
         f"{format_count(len(plan.moves), 'movimento')}"
@@ -1208,12 +1298,12 @@ def apply_restructure_plan(plan: RestructurePlan, *, dry_run: bool, preview_limi
     for folder in plan.folders_to_create:
         if dry_run:
             if shown < preview_limit:
-                print(f"  criar pasta: {format_path(folder, display_base)}")
+                print_line(f"  criar pasta: {format_path(folder, display_base)}")
                 shown += 1
             continue
         folder.mkdir(parents=True, exist_ok=True)
         if shown < preview_limit:
-            print(f"  criada: {format_path(folder, display_base)}")
+            print_line(f"  criada: {format_path(folder, display_base)}")
             shown += 1
 
     apply_plan(
@@ -1226,7 +1316,7 @@ def apply_restructure_plan(plan: RestructurePlan, *, dry_run: bool, preview_limi
 
     remaining = total_actions - min(total_actions, preview_limit)
     if remaining > 0:
-        print(f"  ...mais {format_count(remaining, 'mudanca', 'mudancas')} no log completo")
+        print_line(f"  ...mais {format_count(remaining, 'mudanca', 'mudancas')} no log completo")
 
 
 def ask_gemini_for_category(item: Path, ai_config: dict[str, Any], allowed_categories: list[str]) -> str | None:
@@ -1450,7 +1540,7 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
             protected_skipped += 1
             skipped += 1
             if auto_protected and protected_skipped <= 5:
-                print(f"Auto-protegido: {item.name} ({reason})")
+                print_line(f"Auto-protegido: {item.name} ({reason})")
             continue
 
         if should_skip(
@@ -1468,9 +1558,9 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         items.append(item)
 
     if protected_skipped:
-        print(f"Protegidos ignorados: {format_count(protected_skipped, 'item', 'itens')}")
+        print_line(f"Protegidos ignorados: {format_count(protected_skipped, 'item', 'itens')}")
     elif skipped:
-        print(f"Ignorados por regras: {format_count(skipped, 'item', 'itens')}")
+        print_line(f"Ignorados por regras: {format_count(skipped, 'item', 'itens')}")
 
     ai_decisions = collect_ai_decisions(
         items,
@@ -1744,7 +1834,7 @@ def load_undo_manifest(path: Path) -> dict[str, Any]:
         return json.load(file)
 
 
-def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int) -> None:
+def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int, yes: bool = False) -> None:
     """Reverse a previous apply run from its undo manifest."""
 
     manifest = load_undo_manifest(manifest_path)
@@ -1757,8 +1847,16 @@ def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int) -> None:
         source_dir=Path(manifest.get("source_dir", ".")),
         target_root=Path(manifest.get("target_root", ".")),
     )
-    print(f"Manifesto: {manifest_path}")
-    print(f"Movimentos para desfazer: {len(moves)}")
+    print_line(f"Manifesto: {manifest_path}")
+    print_line(f"Movimentos para desfazer: {len(moves)}")
+
+    if not dry_run:
+        confirm_apply(
+            "Undo",
+            source_dir=Path(manifest.get("source_dir", ".")),
+            count=len(moves),
+            yes=yes,
+        )
 
     for index, entry in enumerate(moves):
         current = Path(entry["to"])
@@ -1768,10 +1866,10 @@ def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int) -> None:
         if dry_run:
             continue
         if not current.exists():
-            print(f"[AVISO] destino atual nao existe, pulando: {current}")
+            print_warning(f"destino atual nao existe, pulando: {current}")
             continue
         if original.exists():
-            print(f"[AVISO] origem original ja existe, pulando: {original}")
+            print_warning(f"origem original ja existe, pulando: {original}")
             continue
         original.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(current), str(original))
@@ -1792,7 +1890,7 @@ def run_undo(manifest_path: Path, *, dry_run: bool, preview_limit: int) -> None:
 
 
 def print_plan_summary(plans: list[MovePlan]) -> None:
-    print(f"Mudancas planejadas: {format_count(len(plans), 'item', 'itens')}")
+    print_line(f"Mudancas planejadas: {format_count(len(plans), 'item', 'itens')}", force=True)
 
 
 def apply_plan(
@@ -1810,17 +1908,17 @@ def apply_plan(
         destination = format_path(plan.destination, display_base)
         if dry_run:
             if index < preview_limit:
-                print(f"{prefix}mover: {source} -> {destination}")
+                print_line(f"{prefix}mover: {source} -> {destination}")
             continue
 
         plan.destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(plan.source), str(plan.destination))
         if index < preview_limit:
-            print(f"{prefix}movido: {source} -> {destination}")
+            print_line(f"{prefix}movido: {source} -> {destination}")
 
     remaining = len(plans) - min(len(plans), preview_limit)
     if remaining > 0 and not indent:
-        print(f"...mais {format_count(remaining, 'mudanca', 'mudancas')} no log completo")
+        print_line(f"...mais {format_count(remaining, 'mudanca', 'mudancas')} no log completo")
 
 
 def yes_no_prompt(question: str, *, default: bool) -> bool:
@@ -1840,6 +1938,24 @@ def text_prompt(question: str, *, default: str) -> str:
     except EOFError:
         answer = ""
     return answer or default
+
+
+def confirm_apply(action: str, *, source_dir: Path, count: int, yes: bool) -> None:
+    """Require explicit confirmation for real filesystem changes."""
+
+    if yes:
+        verbose(f"Confirmacao automatica (--yes) para {action}.")
+        return
+    if count == 0:
+        return
+
+    print_warning(f"{action} vai alterar {format_count(count, 'item', 'itens')} em {source_dir}.")
+    try:
+        answer = input("Digite aplicar para continuar: ").strip().casefold()
+    except EOFError as error:
+        raise RuntimeError("Confirmacao interativa indisponivel. Use --yes em automacoes.") from error
+    if answer != "aplicar":
+        raise RuntimeError("Operacao cancelada. Nada foi alterado.")
 
 
 def sanitize_profile_name(value: str) -> str:
@@ -1943,9 +2059,49 @@ def run_doctor(config: dict[str, Any], *, config_path: Path, use_ai: bool) -> No
     print_done("diagnostico concluido.")
 
 
+def normalize_argv(argv: list[str]) -> list[str]:
+    """Translate semantic commands into the stable flag API."""
+
+    if not argv:
+        return argv
+
+    command = argv[0].casefold()
+    if command == "undo":
+        if len(argv) > 1 and not argv[1].startswith("-"):
+            return ["--undo", argv[1], *argv[2:]]
+        return ["--undo", *argv[1:]]
+
+    mapped = COMMAND_ALIASES.get(command)
+    if mapped is None:
+        return argv
+    return [*mapped, *argv[1:]]
+
+
+def print_examples() -> None:
+    print(ORGANIZER_EXAMPLES.strip())
+
+
+def print_completion() -> None:
+    commands = "run organize apply check doctor wizard init architect examples completion"
+    options = "--folder --profile --config --apply --yes --no-ai --restructure --doctor --wizard --undo --preview-limit --verbose --quiet --no-color --examples --completion"
+    print(
+        "\n".join(
+            [
+                "# PowerShell autocomplete simples",
+                "Register-ArgumentCompleter -Native -CommandName python -ScriptBlock {",
+                "  param($wordToComplete)",
+                f"  '{commands} {options}'.Split(' ') | Where-Object {{ $_ -like \"$wordToComplete*\" }}",
+                "}",
+            ]
+        )
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Organiza arquivos de uma pasta usando regras simples por extensao."
+        description="Organiza arquivos com simulacao segura, IA opcional e undo.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=ORGANIZER_EXAMPLES,
     )
     parser.add_argument(
         "--config",
@@ -1964,6 +2120,12 @@ def parse_args() -> argparse.Namespace:
         "--apply",
         action="store_true",
         help="Move os arquivos de verdade. Sem esta opcao, roda em modo simulacao.",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Confirma a execucao real sem pergunta interativa. Util para automacao.",
     )
     parser.add_argument(
         "--no-ai",
@@ -1995,21 +2157,35 @@ def parse_args() -> argparse.Namespace:
         "--undo",
         help="Desfaz uma execucao a partir de um manifesto logs/undo_*.json. Simula por padrao; use --apply.",
     )
-    return parser.parse_args()
+    parser.add_argument("--examples", action="store_true", help="Mostra exemplos reais de uso.")
+    parser.add_argument("--completion", action="store_true", help="Mostra autocomplete simples para PowerShell.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Mostra detalhes extras de execucao.")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Reduz o output no terminal.")
+    parser.add_argument("--no-color", action="store_true", help="Desativa cores ANSI.")
+    return parser.parse_args(normalize_argv(sys.argv[1:]))
 
 
 def main() -> None:
     args = parse_args()
+    configure_cli(args)
     load_env()
     dry_run = not args.apply
     preview_limit = max(args.preview_limit, 0)
+
+    if args.examples:
+        print_examples()
+        return
+
+    if args.completion:
+        print_completion()
+        return
 
     if args.wizard:
         run_wizard()
         return
 
     if args.undo:
-        run_undo(Path(args.undo), dry_run=dry_run, preview_limit=preview_limit)
+        run_undo(Path(args.undo), dry_run=dry_run, preview_limit=preview_limit, yes=args.yes)
         return
 
     config, config_path = load_config_for_args(args)
@@ -2040,6 +2216,12 @@ def main() -> None:
         print_step("Plano recebido e validado. Preparando execucao...")
         undo_path = None
         if not dry_run:
+            confirm_apply(
+                "Reorganizacao estrutural",
+                source_dir=source_dir,
+                count=len(plan.moves) + len(plan.folders_to_create),
+                yes=args.yes,
+            )
             created_dirs = planned_created_dirs(plan.moves, source_dir, plan.folders_to_create)
             undo_path = write_undo_manifest(
                 mode="restructure",
@@ -2063,10 +2245,10 @@ def main() -> None:
             print_done("simulacao estrutural concluida. Use --apply para executar o plano.")
         else:
             print_done("reorganizacao estrutural concluida.")
-            print(f"Undo: {undo_path}")
-        print(f"Log completo: {log_path}")
-        print(f"Relatorio: {report_md}")
-        print(f"Relatorio HTML: {report_html}")
+            print_line(f"Undo: {undo_path}", force=True)
+        print_line(f"Log completo: {log_path}", force=True)
+        print_line(f"Relatorio: {report_md}", force=True)
+        print_line(f"Relatorio HTML: {report_html}", force=True)
         return
 
     print_header(
@@ -2081,6 +2263,7 @@ def main() -> None:
     print_plan_summary(plans)
     undo_path = None
     if not dry_run:
+        confirm_apply("Organizacao", source_dir=source_dir, count=len(plans), yes=args.yes)
         created_dirs = planned_created_dirs(plans, target_root)
         undo_path = write_undo_manifest(
             mode="organize",
@@ -2103,21 +2286,21 @@ def main() -> None:
         print_done("simulacao concluida. Use --apply para mover os arquivos.")
     else:
         print_done("organizacao concluida.")
-        print(f"Undo: {undo_path}")
+        print_line(f"Undo: {undo_path}", force=True)
 
-    print(f"Log completo: {log_path}")
-    print(f"Relatorio: {report_md}")
-    print(f"Relatorio HTML: {report_html}")
+    print_line(f"Log completo: {log_path}", force=True)
+    print_line(f"Relatorio: {report_md}", force=True)
+    print_line(f"Relatorio HTML: {report_html}", force=True)
 
 
 def run_cli() -> int:
     try:
         main()
     except KeyboardInterrupt:
-        print("\nInterrompido pelo usuario.")
+        print_line("\nInterrompido pelo usuario.", force=True)
         return 130
     except (FileNotFoundError, RuntimeError, ValueError, json.JSONDecodeError) as error:
-        print(f"\nERRO: {error}")
+        print_line(color(f"\nERRO: {error}", "31"), force=True)
         return 1
     return 0
 

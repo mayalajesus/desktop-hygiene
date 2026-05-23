@@ -59,16 +59,15 @@ O projeto usa `gemini-2.5-flash-lite` por padrao, pensado para uso leve no Free 
 Comandos uteis:
 
 ```powershell
-python organizer.py
+python organizer.py check
+python organizer.py run --folder downloads
+python organizer.py apply --folder documents --yes
 python organizer.py --folder list
-python organizer.py --folder downloads
-python organizer.py --folder documents
-python organizer.py --folder pictures
-python organizer.py --folder videos
-python organizer.py --folder music
 python organizer.py --profile list
 python organizer.py --no-ai
 ```
+
+Os comandos antigos com flags continuam funcionando. `run` simula, `apply` executa com confirmacao, `check` diagnostica, `wizard` guia a primeira configuracao e `architect` usa a IA para reestruturar hierarquias.
 
 As pastas padrao ficam em `folders` dentro de `config/rules.json`.
 
@@ -101,6 +100,7 @@ Crie um perfil sem editar JSON:
 
 ```powershell
 python organizer.py --wizard
+python organizer.py init
 ```
 
 ### Modo Arquiteto
@@ -110,6 +110,8 @@ Analisa a estrutura inteira e sugere uma nova hierarquia:
 ```powershell
 python organizer.py --restructure
 python organizer.py --restructure --apply
+python organizer.py architect
+python organizer.py architect --apply --yes
 ```
 
 O plano da IA e validado antes de executar. Caminhos absolutos, `..`, profundidade excessiva e pastas protegidas sao bloqueados.
@@ -127,6 +129,7 @@ Toda aplicacao gera tambem um manifesto de undo:
 ```powershell
 python organizer.py --undo logs/undo_organize_YYYY-MM-DD_HH-MM-SS.json
 python organizer.py --undo logs/undo_organize_YYYY-MM-DD_HH-MM-SS.json --apply
+python organizer.py undo logs/undo_organize_YYYY-MM-DD_HH-MM-SS.json --apply --yes
 ```
 
 ## Pastas Protegidas
@@ -201,12 +204,14 @@ Simular:
 
 ```powershell
 python safe_cleaner.py
+python safe_cleaner.py preview
 ```
 
 Aplicar:
 
 ```powershell
 python safe_cleaner.py --apply
+python safe_cleaner.py apply --yes
 ```
 
 Limpar categorias especificas:
@@ -214,6 +219,8 @@ Limpar categorias especificas:
 ```powershell
 python safe_cleaner.py --only temp recycle
 python safe_cleaner.py --only browsers --apply
+python safe_cleaner.py browsers
+python safe_cleaner.py apply --only temp browsers --yes
 ```
 
 Incluir Registro, de forma conservadora e com backup `.reg`:
@@ -229,6 +236,7 @@ O cleaner pula navegadores e apps abertos por padrao.
 
 - Simulacao por padrao.
 - `--apply` e obrigatorio para alterar algo.
+- Acoes reais pedem confirmacao contextual; use `--yes` apenas em automacoes confiaveis.
 - `.env` fica fora do Git.
 - IA nao recebe conteudo de arquivos.
 - Planos de IA sao validados antes de executar.
