@@ -28,6 +28,19 @@ Para aplicar de verdade:
 python organizer.py --apply
 ```
 
+## Estrutura
+
+```text
+desktop-hygiene/
+|-- desktop_hygiene/      # codigo principal
+|-- profiles/             # perfis simples por pasta
+|-- rules.json            # regras padrao
+|-- organizer.py          # atalho do organizador
+`-- safe_cleaner.py       # atalho do limpador
+```
+
+Os atalhos da raiz existem para manter o uso facil. A logica real fica em `desktop_hygiene/`.
+
 ## Configurar IA
 
 Crie um arquivo `.env`:
