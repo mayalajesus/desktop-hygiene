@@ -91,6 +91,8 @@ Exemplos:
 - `Pessoal/WhatsApp/2026-01-13-whatsapp-image.jpeg`
 - `Documentos/Contratos/2026-01-07-contrato-assinado.pdf`
 
+Quando dois arquivos receberiam o mesmo nome, o app preserva pistas reais do nome original, como horario, numero, cliente, jogo ou versao. O objetivo e evitar nomes repetidos como `arquivo (1).pdf`.
+
 As pastas principais da taxonomia sao protegidas em execucoes futuras, entao o app nao tenta reorganizar `Dev`, `Jogos`, `Midia`, `Documentos` e similares depois de cria-las.
 
 ### Wizard

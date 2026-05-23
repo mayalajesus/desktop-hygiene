@@ -105,6 +105,7 @@
       "WhatsApp Image, WhatsApp Video e midias de conversa pessoal pertencem a Pessoal/WhatsApp, exceto quando o nome indicar trabalho.",
       "Contratos, boletos, comprovantes, planilhas e apresentacoes devem ir para Documentos/* conforme a funcao.",
       "Instaladores, drivers, zips, ferramentas portateis e pacotes baixados pertencem a Sistemas/*.",
+      "Nao repita nomes de arquivos. Quando varios itens forem parecidos, preserve horario, numero, cliente, jogo, versao ou outro detalhe real do nome original.",
       "Proteja workspaces, repositorios e pastas operacionais. Organize instaladores, exports e arquivos soltos.",
       "Padronize nomes em portugues claro, preservando nomes proprios tecnicos como Django, FastAPI, PyTorch, SMAPI, Forge e Fabric."
     ],

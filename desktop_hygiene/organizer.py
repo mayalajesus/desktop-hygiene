@@ -14,6 +14,7 @@ copied to another Windows machine and run without a setup step.
 
 import argparse
 import fnmatch
+import hashlib
 import html
 import json
 import os
@@ -395,6 +396,11 @@ def destination_key(path: Path) -> str:
     return os.path.normcase(normalized).casefold()
 
 
+def destination_available(destination: Path, planned_destinations: set[Path]) -> bool:
+    planned_keys = {destination_key(path) for path in planned_destinations}
+    return not destination.exists() and destination_key(destination) not in planned_keys
+
+
 def unique_planned_destination(destination: Path, planned_destinations: set[Path]) -> Path:
     candidate = unique_destination(destination)
     planned_keys = {destination_key(path) for path in planned_destinations}
@@ -411,6 +417,89 @@ def unique_planned_destination(destination: Path, planned_destinations: set[Path
         if not candidate.exists() and destination_key(candidate) not in planned_keys:
             return candidate
         counter += 1
+
+
+def disambiguator_hash(source: Path) -> str:
+    try:
+        value = str(source.resolve(strict=False))
+    except OSError:
+        value = str(source)
+    return hashlib.blake2s(value.encode("utf-8", "ignore"), digest_size=4).hexdigest()
+
+
+def source_disambiguators(source: Path, destination: Path) -> list[str]:
+    """Build human-readable suffixes to avoid repeated destination names."""
+
+    source_slug = slugify_name(source.stem if source.is_file() else source.name, separator="-", max_length=120)
+    destination_slug = slugify_name(destination.stem, separator="-", max_length=120)
+    destination_tokens = set(destination_slug.split("-"))
+    suffixes: list[str] = []
+
+    def add(value: str) -> None:
+        suffix = slugify_name(value, separator="-", max_length=32)
+        if suffix and suffix not in destination_slug and suffix not in suffixes:
+            suffixes.append(suffix)
+
+    for match in re.finditer(r"(?<!\d)(\d{1,2})[._h:-](\d{2})(?:[._:-](\d{2}))?(?!\d)", source.name):
+        add("-".join(part for part in match.groups() if part))
+
+    for number in re.findall(r"\d{2,}", source_slug):
+        if number not in destination_tokens:
+            add(number)
+
+    stopwords = {
+        "a",
+        "at",
+        "de",
+        "do",
+        "da",
+        "das",
+        "dos",
+        "image",
+        "img",
+        "video",
+        "whatsapp",
+        "arquivo",
+        "documento",
+    }
+    unique_tokens = [
+        token
+        for token in source_slug.split("-")
+        if token and token not in destination_tokens and token not in stopwords
+    ]
+    for size in (3, 2, 1):
+        if len(unique_tokens) >= size:
+            add("-".join(unique_tokens[-size:]))
+
+    add(disambiguator_hash(source))
+    return suffixes
+
+
+def destination_with_name_suffix(destination: Path, suffix: str, max_stem_length: int) -> Path:
+    stem_limit = max(12, max_stem_length - len(suffix) - 1)
+    stem = destination.stem[:stem_limit].rstrip("-_ .")
+    return destination.with_name(f"{stem}-{suffix}{destination.suffix}")
+
+
+def unique_descriptive_destination(
+    source: Path,
+    destination: Path,
+    planned_destinations: set[Path],
+    *,
+    max_stem_length: int = 80,
+    avoid_base_name: bool = False,
+) -> Path:
+    """Return a unique destination without generic repeated-name suffixes."""
+
+    if not avoid_base_name and destination_available(destination, planned_destinations):
+        return destination
+
+    for suffix in source_disambiguators(source, destination):
+        candidate = destination_with_name_suffix(destination, suffix, max_stem_length)
+        if destination_available(candidate, planned_destinations):
+            return candidate
+
+    return unique_planned_destination(destination, planned_destinations)
 
 
 def relative_depth(path: Path) -> int:
@@ -724,6 +813,7 @@ def ask_gemini_for_batch_organization(
         f"{hint_text}"
         f"Nome: {style}, max {max_length}, taxonomia {taxonomy}. "
         "Padronize nomes. Para arquivos, retorne nome SEM extensao. "
+        "Nao repita nomes para itens diferentes; preserve pistas distintivas como horario, numero, cliente, jogo ou versao. "
         "Use pistas h quando existirem. Nao invente dados.\n"
         'Formato: {"items":[{"id":0,"category":"...","name":"..."}]}\n'
         f"Itens: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
@@ -970,7 +1060,7 @@ def add_structural_move(
         raise ValueError(f"Destino excede profundidade maxima de {max_depth}: {destination_relative}")
 
     used_sources.add(source)
-    safe_destination = unique_planned_destination(destination, planned_destinations)
+    safe_destination = unique_descriptive_destination(source, destination, planned_destinations)
     planned_destinations.add(safe_destination)
     moves.append(MovePlan(source, safe_destination, reason))
 
@@ -1187,6 +1277,7 @@ def ask_gemini_for_organization(
         f"Politica de data: {date_policy}. "
         f"Limite do nome sem extensao: {max_length} caracteres. "
         f"{suffix_instruction} "
+        "Nao gere nomes iguais para arquivos diferentes; use horario, numero, cliente, jogo, versao ou outro detalhe real quando existir. "
         "Responda somente JSON valido, sem markdown, neste formato: "
         '{"category":"CategoriaPermitida","name":"nome-padronizado"}.\n\n'
         f"Categorias permitidas: {categories}\n"
@@ -1342,6 +1433,7 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         raise FileNotFoundError(f"Pasta de origem nao encontrada: {source_dir}")
 
     plans: list[MovePlan] = []
+    raw_plans: list[tuple[Path, Path, str]] = []
     planned_destinations: set[Path] = set()
     items: list[Path] = []
     skipped = 0
@@ -1412,7 +1504,22 @@ def create_move_plan(config: dict[str, Any], *, use_ai: bool) -> list[MovePlan]:
         except OSError:
             pass
 
-        destination = unique_planned_destination(raw_destination, planned_destinations)
+        raw_plans.append((item, raw_destination, reason))
+
+    destination_counts: dict[str, int] = {}
+    for _item, raw_destination, _reason in raw_plans:
+        key = destination_key(raw_destination)
+        destination_counts[key] = destination_counts.get(key, 0) + 1
+
+    max_stem_length = int(rename_config.get("max_length", 80))
+    for item, raw_destination, reason in raw_plans:
+        destination = unique_descriptive_destination(
+            item,
+            raw_destination,
+            planned_destinations,
+            max_stem_length=max_stem_length,
+            avoid_base_name=destination_counts[destination_key(raw_destination)] > 1,
+        )
         planned_destinations.add(destination)
         plans.append(MovePlan(item, destination, reason))
 
