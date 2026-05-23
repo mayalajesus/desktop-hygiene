@@ -1,0 +1,11 @@
+[project]
+name = "desktop-hygiene"
+version = "0.1.0"
+description = "Safe Windows desktop organizer and cleaner."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+desktop-organizer = "desktop_hygiene.organizer:run_cli"
+desktop-cleaner = "desktop_hygiene.safe_cleaner:run_cli"

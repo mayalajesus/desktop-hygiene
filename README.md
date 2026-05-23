@@ -32,14 +32,17 @@ python organizer.py --apply
 
 ```text
 desktop-hygiene/
-|-- desktop_hygiene/      # codigo principal
-|-- profiles/             # perfis simples por pasta
-|-- rules.json            # regras padrao
-|-- organizer.py          # atalho do organizador
-`-- safe_cleaner.py       # atalho do limpador
+|-- desktop_hygiene/       # codigo principal do app
+|-- config/                # taxonomia e perfis
+|   |-- rules.json         # regras padrao
+|   `-- profiles/          # perfis simples por pasta
+|-- organizer.py           # atalho do organizador
+|-- safe_cleaner.py        # atalho do limpador
+|-- pyproject.toml         # identidade do projeto Python
+`-- README.md              # guia rapido
 ```
 
-Os atalhos da raiz existem para manter o uso facil. A logica real fica em `desktop_hygiene/`.
+A pasta principal do projeto deve se chamar `desktop-hygiene` quando clonado ou publicado. Os atalhos da raiz existem para manter o uso facil. A logica real fica em `desktop_hygiene/`.
 
 ## Configurar IA
 
@@ -67,11 +70,11 @@ python organizer.py --profile list
 python organizer.py --no-ai
 ```
 
-As pastas padrao ficam em `folders` dentro do `rules.json`.
+As pastas padrao ficam em `folders` dentro de `config/rules.json`.
 
 Use `--folder` quando quiser pular a pergunta interativa.
 
-Perfis continuam disponiveis em `profiles/` para casos avancados.
+Perfis continuam disponiveis em `config/profiles/` para casos avancados.
 
 ### Taxonomia
 
@@ -135,7 +138,7 @@ O app tenta detectar isso sozinho usando sinais locais:
 - filhos como `.git`, `.vscode`, `node_modules`, `package.json`
 - palavras como `workspace`, `saves`, `config`, `settings`
 
-Isso fica em `auto_protect` no `rules.json` e vem ligado por padrao.
+Isso fica em `auto_protect` no `config/rules.json` e vem ligado por padrao.
 
 As listas `protected_names` e `protected_patterns` continuam existindo, mas agora sao complemento. Use apenas para casos especiais que o detector automatico nao pegou.
 
@@ -229,16 +232,6 @@ O cleaner pula navegadores e apps abertos por padrao.
 - Planos de IA sao validados antes de executar.
 - Undo e gerado em toda aplicacao do organizador.
 - Registro so e limpo com `--include-registry`.
-
-## Estrutura
-
-```text
-organizer.py       Organizador com IA, perfis, relatorios e undo
-safe_cleaner.py    Limpador seguro do Windows
-rules.json         Configuracao base
-profiles/          Perfis prontos
-CONTRIBUTING.md    Notas para manutencao
-```
 
 ## Validacao Local
 

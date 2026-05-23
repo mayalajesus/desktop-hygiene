@@ -30,10 +30,10 @@ from pathlib import Path
 from typing import Any
 
 
-CONFIG_FILE = "rules.json"
+CONFIG_FILE = "config/rules.json"
 ENV_FILE = ".env"
 LOG_DIR = "logs"
-PROFILE_DIR = "profiles"
+PROFILE_DIR = "config/profiles"
 REPORT_DIR = "reports"
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_PREVIEW_LIMIT = 25
@@ -178,7 +178,7 @@ def load_config_for_args(args: argparse.Namespace) -> tuple[dict[str, Any], Path
             for profile in profiles:
                 print(f"- {profile}")
         else:
-            print("Nenhum perfil encontrado em profiles/.")
+            print(f"Nenhum perfil encontrado em {PROFILE_DIR}/.")
         raise SystemExit(0)
 
     selected_profile_path = profile_path(args.profile)
@@ -1843,15 +1843,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         default=CONFIG_FILE,
-        help="Caminho para o arquivo de regras. Padrao: rules.json",
+        help=f"Caminho para o arquivo de regras. Padrao: {CONFIG_FILE}",
     )
     parser.add_argument(
         "--profile",
-        help="Carrega um perfil de profiles/<nome>.json sobre rules.json. Use --profile list para listar.",
+        help=f"Carrega um perfil de {PROFILE_DIR}/<nome>.json sobre {CONFIG_FILE}. Use --profile list para listar.",
     )
     parser.add_argument(
         "--folder",
-        help="Escolhe uma pasta padrao do bloco folders em rules.json. Use --folder list para listar.",
+        help=f"Escolhe uma pasta padrao do bloco folders em {CONFIG_FILE}. Use --folder list para listar.",
     )
     parser.add_argument(
         "--apply",

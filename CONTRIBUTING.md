@@ -20,8 +20,9 @@ python safe_cleaner.py --only temp --older-than-days 9999
 
 ## Files
 
-- `organizer.py`: AI-assisted file/folder organization, profiles, reports, undo.
-- `safe_cleaner.py`: conservative Windows temp/cache cleaner.
-- `rules.json`: base configuration.
-- `profiles/`: small overrides for common folders.
-
+- `desktop_hygiene/`: application code.
+- `config/rules.json`: base taxonomy and safety rules.
+- `config/profiles/`: small overrides for common folders.
+- `organizer.py`: beginner-friendly organizer shortcut.
+- `safe_cleaner.py`: beginner-friendly cleaner shortcut.
+- `pyproject.toml`: Python project identity and optional CLI entry points.
